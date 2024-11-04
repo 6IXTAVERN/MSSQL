@@ -1,4 +1,11 @@
-# <img src="https://github.com/6IXTAVERN/MySQL/assets/116119822/2c2fe8b2-aba7-4fb0-bc48-6899135c5613" width="20" height="20"/> Lab1
+<h1 align="center"><a href=""><img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/></a> MSSQL</h1>
+
+<p align="center">
+  <a href="#-lab1"><img alt="lab1" src="https://img.shields.io/badge/Lab1-blue"></a> 
+  <a href="#-lab2"><img alt="lab2" src="https://img.shields.io/badge/Lab2-red"></a>
+</p>
+
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab1
 <h3 align="center">
   <a href="#client"></a>
   1.1 Разработать представления или хранимые процедуры для выполнения заданий.
@@ -246,7 +253,7 @@ EXEC GetObjectProperties 'dbo', 'Customers';
 
 TODO: таблица
 
-
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab2
 <h3 align="center">
   <a href="#client"></a>
   2 Создать процедуру, которая принимает в качестве параметров имя таблицы и имена двух полей этой таблице и добавляет содержимое первого поля к содержимому второго. 
