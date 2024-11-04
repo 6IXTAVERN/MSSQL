@@ -236,22 +236,81 @@ END;
 EXEC GetObjectProperties 'dbo', 'Customers';
 ```
 
-TODO: таблица
+| ObjectName | SchemaName | ObjectType | CreationDate | LastModifiedDate | PermissionName | PermissionState |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Customers | dbo | USER\_TABLE | 2024-11-04 01:22:50.220 | 2024-11-04 01:22:50.220 | null | null |
+
+| ColumnName | DataType | MaxLength | IsNullable | IsIdentity |
+| :--- | :--- | :--- | :--- | :--- |
+| CustomerID | nchar | 10 | false | false |
+| CompanyName | nvarchar | 80 | false | false |
+| ContactName | nvarchar | 60 | true | false |
+| ContactTitle | nvarchar | 60 | true | false |
+| Address | nvarchar | 120 | true | false |
+| City | nvarchar | 30 | true | false |
+| Region | nvarchar | 30 | true | false |
+| PostalCode | nvarchar | 20 | true | false |
+| Country | nvarchar | 30 | true | false |
+| Phone | nvarchar | 48 | true | false |
+| Fax | nvarchar | 48 | true | false |
+
+| ConstraintName | ConstraintType |
+| :--- | :--- |
+| PK\_Customers | PRIMARY\_KEY\_CONSTRAINT |
+
+| TriggerName | IsDisabled |
+| :--- | :--- |
+
+| ReferencingObject | ReferencingType |
+| :--- | :--- |
+
 
 ```tsql
 -- Использование (пример с представлением)
-EXEC GetObjectProperties 'dbo', 'Customers';
+EXEC GetObjectProperties 'dbo', 'vw_EmployeeNames';
 ```
 
-TODO: таблица
+| ObjectName | SchemaName | ObjectType | CreationDate | LastModifiedDate | PermissionName | PermissionState |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| vw\_EmployeeNames | dbo | VIEW | 2024-11-04 02:00:16.240 | 2024-11-04 02:00:16.240 | null | null |
+
+| ColumnName | DataType | MaxLength | IsNullable | IsIdentity |
+| :--- | :--- | :--- | :--- | :--- |
+| FirstName | nvarchar | 20 | false | false |
+| LastName | nvarchar | 40 | false | false |
+| Country | nvarchar | 30 | true | false |
+
+| ConstraintName | ConstraintType |
+| :--- | :--- |
+
+| TriggerName | IsDisabled |
+| :--- | :--- |
+
+| ReferencingObject | ReferencingType |
+| :--- | :--- |
 
 
 ```tsql
--- Использование (пример с тпроцедурой)
-EXEC GetObjectProperties 'dbo', 'Customers';
+-- Использование (пример с процедурой)
+EXEC GetObjectProperties 'dbo', 'GetPrimaryKeyColumns';
 ```
 
-TODO: таблица
+| ObjectName | SchemaName | ObjectType | CreationDate | LastModifiedDate | PermissionName | PermissionState |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| GetPrimaryKeyColumns | dbo | SQL\_STORED\_PROCEDURE | 2024-11-04 01:48:34.420 | 2024-11-04 01:48:34.420 | null | null |
+
+| ParameterName | DataType | MaxLength | IsOutput |
+| :--- | :--- | :--- | :--- |
+| @TableName | nvarchar | 256 | false |
+| @TableName | sysname | 256 | false |
+
+| ObjectText |
+| :--- |
+| CREATE PROCEDURE GetPrimaryKeyColumns<br/>    @TableName NVARCHAR\(128\)<br/>AS<br/>BEGIN<br/>    SET NOCOUNT ON;<br/><br/>    SELECT <br/>        kcu.COLUMN\_NAME<br/>    FROM <br/>        INFORMATION\_SCHEMA.TABLE\_CONSTRAINTS AS tc<br/>    JOIN <br/>        INFORMATION\_SCHEMA.KEY\_COLUMN\_USAGE AS kcu <br/>        ON tc.CONSTRAINT\_NAME = kcu.CONSTRAINT\_NAME<br/>    WHERE <br/>        tc.TABLE\_NAME = @TableName <br/>        AND tc.CONSTRAINT\_TYPE = 'PRIMARY KEY';<br/>END |
+
+| ReferencingObjectName | ReferencingObjectType |
+| :--- | :--- |
+
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab2
 <h3 align="center">
