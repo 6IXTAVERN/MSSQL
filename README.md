@@ -16,20 +16,45 @@
 --- №6
 -- Пояснение: запрос находит таблицы, у которых все столбцы не имеют IDENTITY - в параметрах "Удостоверение"
 -- т.е. авто-приращение идентификатора при создании новых записей
-CREATE PROCEDURE GetTablesWithoutIdentityColumns
+CREATE OR ALTER PROCEDURE GetTablesWithoutIdentityColumns
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT t.name AS TableName, t.object_id
-    FROM sys.tables t
-    WHERE t.object_id NOT IN (
-        SELECT c.object_id
-        FROM sys.columns c
-        WHERE c.is_identity = 1
-    )
-    ORDER BY t.name;
-END
+    DECLARE @dbname NVARCHAR(128);
+    DECLARE @sql NVARCHAR(MAX);
+
+    -- Создаем курсор для перебора всех баз данных
+    DECLARE db_cursor CURSOR FOR
+    SELECT name
+    FROM sys.databases
+
+    OPEN db_cursor;
+
+    FETCH NEXT FROM db_cursor INTO @dbname;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @sql =
+        '
+            SELECT ''' + @dbname + ''' AS DatabaseName, s.name AS SchemaName, t.name AS TableName, t.object_id AS ObjectId
+            FROM ' + QUOTENAME(@dbname) + '.sys.tables t
+            JOIN ' + QUOTENAME(@dbname) + '.sys.schemas s ON t.schema_id = s.schema_id
+            WHERE t.object_id NOT IN (
+                SELECT c.object_id
+                FROM ' + QUOTENAME(@dbname) + '.sys.columns c
+                WHERE c.is_identity = 1
+            )
+        ';
+
+        EXEC sp_executesql @sql;
+
+        FETCH NEXT FROM db_cursor INTO @dbname;
+    END;
+
+    CLOSE db_cursor;
+    DEALLOCATE db_cursor;
+END;
 ```
 
 ```tsql
@@ -37,26 +62,81 @@ END
 EXEC GetTablesWithoutIdentityColumns;
 ```
 
-| TableName | object\_id |
-| :--- | :--- |
-| Customers | 901578250 |
-| Order Details | 965578478 |
+| DatabaseName | SchemaName | TableName | ObjectId |
+| :--- | :--- | :--- | :--- |
+| master | dbo | spt\_fallback\_db | 117575457 |
+| master | dbo | spt\_fallback\_dev | 133575514 |
+| master | dbo | spt\_fallback\_usg | 149575571 |
+| master | dbo | spt\_monitor | 1803153469 |
+| master | dbo | MSreplication\_options | 2107154552 |
+
+| DatabaseName | SchemaName | TableName | ObjectId |
+| :--- | :--- | :--- | :--- |
+| Northwind | dbo | Customers | 901578250 |
+| Northwind | dbo | Order Details | 965578478 |
+
+| DatabaseName | SchemaName | TableName | ObjectId |
+| :--- | :--- | :--- | :--- |
+| test | dbo | test\_table | 901578250 |
+
+| DatabaseName | SchemaName | TableName | ObjectId |
+| :--- | :--- | :--- | :--- |
+| msdb | dbo | sysnotifications | 2099048 |
+| msdb | dbo | sysutility\_ucp\_snapshot\_partitions\_internal | 13243102 |
+| msdb | dbo | syscachedcredentials | 34099162 |
+| msdb | dbo | syscollector\_blobs\_internal | 36195179 |
+| msdb | dbo | sysutility\_mi\_volumes\_stage\_internal | 93243387 |
+| msdb | dbo | syscollector\_tsql\_query\_collector | 100195407 |
+| msdb | dbo | sysutility\_ucp\_aggregated\_dac\_health\_internal | 121767491 |
+| msdb | dbo | sysutility\_mi\_cpu\_stage\_internal | 173243672 |
+| msdb | dbo | sysssispackages | 231671873 |
+| msdb | dbo | sysssispackagefolders | 311672158 |
+| msdb | dbo | sysutility\_ucp\_aggregated\_mi\_health\_internal | 361768346 |
+| msdb | dbo | syspolicy\_execution\_internal | 432720594 |
+| ...  |
+
 
 
 #### №29 Вывести все таблицы SQL Server, на которые напрямую ссылается хотя бы одно представление.
 ```tsql
 -- №29
-CREATE PROCEDURE GetTablesReferencedByViews
+CREATE OR ALTER PROCEDURE GetTablesReferencedByViews
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT DISTINCT t.name AS TableName, t.object_id AS TableId
-    FROM sys.tables t
-    JOIN sys.sql_expression_dependencies d ON t.object_id = d.referenced_id
-    JOIN sys.views v ON d.referencing_id = v.object_id
-    WHERE d.referenced_class_desc = 'OBJECT_OR_COLUMN'
-    ORDER BY t.name;
+    DECLARE @dbname NVARCHAR(128);
+    DECLARE @sql NVARCHAR(MAX);
+
+    -- Создаем курсор для перебора всех баз данных
+    DECLARE db_cursor CURSOR FOR
+    SELECT name
+    FROM sys.databases
+
+    OPEN db_cursor;
+
+    FETCH NEXT FROM db_cursor INTO @dbname;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @sql =
+        '
+            SELECT DISTINCT ''' + @dbname + ''' AS DatabaseName, s.name AS SchemaName, t.name AS TableName, t.object_id AS TableId
+            FROM ' + QUOTENAME(@dbname) + '.sys.tables t
+            JOIN ' + QUOTENAME(@dbname) + '.sys.schemas s ON t.schema_id = s.schema_id
+            JOIN ' + QUOTENAME(@dbname) + '.sys.sql_expression_dependencies d ON t.object_id = d.referenced_id
+            JOIN ' + QUOTENAME(@dbname) + '.sys.views v ON d.referencing_id = v.object_id
+            WHERE d.referenced_class_desc = ''OBJECT_OR_COLUMN''
+            ORDER BY t.name;
+        ';
+
+        EXEC sp_executesql @sql;
+
+        FETCH NEXT FROM db_cursor INTO @dbname;
+    END;
+
+    CLOSE db_cursor;
+    DEALLOCATE db_cursor;
 END;
 ```
 
@@ -72,31 +152,48 @@ FROM Employees;
 EXEC GetTablesReferencedByViews;
 ```
 
-| TableName | TableId |
-| :--- | :--- |
-| Employees | 933578364 |
+| DatabaseName | SchemaName | TableName | TableId |
+| :--- | :--- | :--- | :--- |
+| Northwind | dbo | Employees | 933578364 |
+
 
 
 #### №38 Вывести все столбцы первичного ключа для указанной таблицы.
 ```tsql
 -- №38
 -- Пояснение: процедура находит названия столбцов в указанной таблице, которые являются первичными ключами
-CREATE PROCEDURE GetPrimaryKeyColumns
+CREATE OR ALTER PROCEDURE GetPrimaryKeyColumns
+    @DatabaseName NVARCHAR(128),
+    @SchemaName NVARCHAR(128),
     @TableName NVARCHAR(128)
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT kcu.COLUMN_NAME
-    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc
-    JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS kcu ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-    WHERE tc.TABLE_NAME = @TableName AND tc.CONSTRAINT_TYPE = 'PRIMARY KEY';
-END
+    DECLARE @SQL NVARCHAR(MAX);
+
+    -- Формируем динамический SQL запрос
+    SET @SQL = N'
+        SELECT kcu.COLUMN_NAME
+        FROM ' + QUOTENAME(@DatabaseName) + '.INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc
+        JOIN ' + QUOTENAME(@DatabaseName) + '.INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS kcu
+        ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+        AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+        WHERE tc.TABLE_NAME = @TableName
+        AND tc.TABLE_SCHEMA = @SchemaName
+        AND tc.CONSTRAINT_TYPE = ''PRIMARY KEY''
+    ';
+
+    -- Выполняем динамический SQL запрос с использованием sp_executesql
+    EXEC sp_executesql @SQL,
+        N'@TableName NVARCHAR(128), @SchemaName NVARCHAR(128)',
+        @TableName=@TableName, @SchemaName=@SchemaName;
+END;
 ```
 
 ```tsql
 -- Использование
-EXEC GetPrimaryKeyColumns @TableName = 'Order Details';
+EXEC GetPrimaryKeyColumns @DatabaseName = 'Northwind', @SchemaName = 'dbo', @TableName = 'Order Details';
 ```
 
 | COLUMN\_NAME |
