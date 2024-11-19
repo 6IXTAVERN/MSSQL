@@ -207,11 +207,13 @@ EXEC GetPrimaryKeyColumns @DatabaseName = 'Northwind', @SchemaName = 'dbo', @Tab
 </h3>
 
 ```tsql
-CREATE PROCEDURE GetObjectProperties
+CREATE OR ALTER PROCEDURE GetObjectProperties
     @SchemaName NVARCHAR(128),
     @ObjectName NVARCHAR(128)
 AS
 BEGIN
+    SET NOCOUNT ON;
+
     -- Определение типа объекта
     DECLARE @ObjectType NVARCHAR(2);
     SELECT @ObjectType = TYPE
@@ -224,18 +226,25 @@ BEGIN
         RETURN;
     END
 
-    -- Общая информация: дата создания, модификация, права
-    SELECT 
+    -- Общая информация: дата создания, модификация
+    SELECT
         sys_obj.name AS ObjectName,
         SCHEMA_NAME(sys_obj.schema_id) AS SchemaName,
         sys_obj.type_desc AS ObjectType,
         sys_obj.create_date AS CreationDate,
-        sys_obj.modify_date AS LastModifiedDate,
-        db_permissions.permission_name AS PermissionName,
-        db_permissions.state_desc AS PermissionState
+        sys_obj.modify_date AS LastModifiedDate
     FROM sys.objects sys_obj
-    LEFT JOIN sys.database_permissions db_permissions ON db_permissions.major_id = sys_obj.object_id
     WHERE sys_obj.name = @ObjectName AND SCHEMA_NAME(sys_obj.schema_id) = @SchemaName;
+
+    -- Права доступа
+    SELECT
+        dp.permission_name AS PermissionName,
+        dp.state_desc AS PermissionState,
+        dp.grantee_principal_id AS GranteePrincipalId,
+        dp.grantor_principal_id AS GrantorPrincipalId,
+        dp.type AS PermissionType
+    FROM sys.database_permissions dp
+    WHERE dp.major_id = OBJECT_ID(QUOTENAME(@SchemaName) + '.' + QUOTENAME(@ObjectName));
 
     -- Таблицы(U) и представления(V)
     IF @ObjectType IN ('U', 'V')
@@ -329,6 +338,8 @@ END;
 ```
 
 ```tsql
+CREATE USER TestUser WITHOUT LOGIN;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.Employees TO TestUser;
 -- Использование (пример с таблицей)
 EXEC GetObjectProperties 'dbo', 'Customers';
 ```
@@ -361,8 +372,16 @@ EXEC GetObjectProperties 'dbo', 'Customers';
 | ReferencingObject | ReferencingType |
 | :--- | :--- |
 
+| PermissionName | PermissionState | GranteePrincipalId | GrantorPrincipalId | PermissionType |
+| :--- | :--- | :--- | :--- | :--- |
+| DELETE | GRANT | 5 | 1 | DL   |
+| INSERT | GRANT | 5 | 1 | IN   |
+| SELECT | GRANT | 5 | 1 | SL   |
+| UPDATE | GRANT | 5 | 1 | UP   |
+
 
 ```tsql
+GRANT SELECT ON vw_EmployeeNames TO TestUser;
 -- Использование (пример с представлением)
 EXEC GetObjectProperties 'dbo', 'vw_EmployeeNames';
 ```
@@ -386,8 +405,13 @@ EXEC GetObjectProperties 'dbo', 'vw_EmployeeNames';
 | ReferencingObject | ReferencingType |
 | :--- | :--- |
 
+| PermissionName | PermissionState | GranteePrincipalId | GrantorPrincipalId | PermissionType |
+| :--- | :--- | :--- | :--- | :--- |
+| SELECT | GRANT | 5 | 1 | SL   |
+
 
 ```tsql
+GRANT EXECUTE ON GetPrimaryKeyColumns TO TestUser;
 -- Использование (пример с процедурой)
 EXEC GetObjectProperties 'dbo', 'GetPrimaryKeyColumns';
 ```
@@ -407,6 +431,10 @@ EXEC GetObjectProperties 'dbo', 'GetPrimaryKeyColumns';
 
 | ReferencingObjectName | ReferencingObjectType |
 | :--- | :--- |
+
+| PermissionName | PermissionState | GranteePrincipalId | GrantorPrincipalId | PermissionType |
+| :--- | :--- | :--- | :--- | :--- |
+| EXECUTE | GRANT | 5 | 1 | EX   |
 
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab2
