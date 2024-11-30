@@ -516,4 +516,117 @@ SELECT * FROM SampleTable;
 | 4 | null | null |
 
 
+<p align="center">
+  <a href="#-lab1"><img alt="lab1" src="https://img.shields.io/badge/Lab1-blue"></a> 
+  <a href="#-lab2"><img alt="lab2" src="https://img.shields.io/badge/Lab2-red"></a>
+</p>
+
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab3
+<h3 align="center">
+  <a href="#client"></a>
+  Политика доступа на основе RLS. Мандатный доступ.
+</h3>
+
+#### Часть А.
+```tsql
+-- Инициализация тестовых и прочих данных
+USE Lab3;
+
+-- Создание и заполнение таблицы с информацией и уровнем доступа для нее
+CREATE TABLE [Information](
+    ID INT PRIMARY KEY IDENTITY(1,1) NOT NULL,
+    [Name] NVARCHAR(75) NOT NULL,
+    [Classification] NVARCHAR(75) NOT NULL
+)
+INSERT INTO [Information]([Name], [Classification])
+VALUES
+(N'Ivan Ivanov', N'SECRET'),
+(N'Peter Petrov', N'TOP SECRET'),
+(N'Michael Sidorov', N'UNCLASSIFIED')
+
+-- Создание и заполнение таблицы пользователей и их уровня доступа
+CREATE TABLE [Users](
+	[User] NVARCHAR(75) PRIMARY KEY NOT NULL,
+	[Clearance] NVARCHAR(75) NOT NULL
+)
+INSERT INTO [Users]([User], [Clearance])
+VALUES
+(N'Anna', N'SECRET'),
+(N'Alex', N'UNCLASSIFIED')
+
+-- Создание и заполнение таблицы уровней доступа
+CREATE TABLE [AccessLevel](
+	[Label] NVARCHAR(75) PRIMARY KEY NOT NULL,
+	[Level] INT NOT NULL
+)
+INSERT INTO [AccessLevel]([Label], [Level])
+VALUES
+(N'TOP SECRET',2),
+(N'SECRET',1),
+(N'UNCLASSIFIED',0)
+
+-- Создание пользователей, ролей и выдача прав
+CREATE USER [Anna] WITHOUT LOGIN WITH DEFAULT_SCHEMA=[dbo]
+CREATE USER [Alex] WITHOUT LOGIN WITH DEFAULT_SCHEMA=[dbo]
+CREATE ROLE [Пользователь]
+ALTER ROLE [Пользователь] ADD MEMBER [Anna]
+ALTER ROLE [Пользователь] ADD MEMBER [Alex]
+GRANT SELECT ON [dbo].[Information] TO [Пользователь]
+```
+
+```tsql
+-- Создание схемы Security для объектов, связанных с безопасностью
+CREATE SCHEMA Security
+
+-- Создание предиката безопасности, который проверяет, имеет ли текущий пользователь доступ к записи с указанной классификацией
+CREATE OR ALTER FUNCTION Security.fn_FilterInformationByAccessLevel(@Classification AS NVARCHAR(75))
+RETURNS TABLE
+WITH SCHEMABINDING
+AS
+RETURN SELECT 1 AS fn_result
+WHERE(
+    -- Получение числового уровня допуска текущего пользователя
+    (SELECT [Level]
+     FROM [dbo].[AccessLevel] AS AccessLevel
+     JOIN [dbo].[Users] AS Users ON Users.[Clearance] = AccessLevel.[Label]
+     WHERE Users.[User] = current_user)
+	>=
+    -- Получение числового уровня секретности запрашиваемой строки
+    (SELECT [Level]
+     FROM [dbo].[AccessLevel] AS AccessLevel
+     WHERE AccessLevel.[Label] = @Classification)
+)
+```
+
+```tsql
+-- Создание политики безопасности с применением предиката безопасности для таблицы
+CREATE SECURITY POLICY Security.Information_RLS_Policy
+ADD FILTER PREDICATE Security.fn_FilterInformationByAccessLevel([Classification])
+ON [dbo].[Information]
+WITH (STATE=ON)
+```
+
+Тестирование:
+```tsql
+EXECUTE AS USER = 'Anna';
+SELECT * FROM [dbo].[Information]; -- запрос выполняется от имени пользователя Anna
+REVERT;
+```
+
+| ID | Name | Classification |
+| :--- | :--- | :--- |
+| 1 | Ivan Ivanov | SECRET |
+| 3 | Michael Sidorov | UNCLASSIFIED |
+
+
+```tsql
+EXECUTE AS USER = 'Alex';
+SELECT * FROM [dbo].[Information]; -- запрос выполняется от имени пользователя Alex
+REVERT;
+```
+
+| ID | Name | Classification |
+| :--- | :--- | :--- |
+| 3 | Michael Sidorov | UNCLASSIFIED |
+
 
