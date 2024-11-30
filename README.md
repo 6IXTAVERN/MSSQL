@@ -629,4 +629,131 @@ REVERT;
 | :--- | :--- | :--- |
 | 3 | Michael Sidorov | UNCLASSIFIED |
 
+#### Часть B. Задание 1
+```tsql
+-- Выдача разрешение на редактирование и просмотр
+GRANT SELECT, UPDATE ON [dbo].[Information] to [Пользователь]
+
+-- Создание триггера для обновления записи в зависимости от доступа пользователя 
+CREATE OR ALTER TRIGGER UpClassification
+ON [dbo].[Information]
+AFTER UPDATE
+AS
+BEGIN
+    DECLARE @UserClearance NVARCHAR(75)
+
+    -- Получение уровня доступа текущего пользователя
+    SELECT @UserClearance = [Clearance]
+    FROM [dbo].[Users]
+    WHERE [User] = CURRENT_USER
+
+    -- Обновление в зависимости от уровня доступа пользователя
+    UPDATE Information
+    SET [Classification] = @UserClearance
+    FROM [dbo].[Information] AS Information
+    JOIN Inserted ON Information.ID = Inserted.ID
+    WHERE Information.[Classification] != @UserClearance;
+END
+```
+
+Тестирование:
+```tsql
+EXECUTE AS USER = 'Anna';
+SELECT * FROM [dbo].[Information]
+UPDATE [dbo].[Information]
+SET [Name] = N'Michael Sidorov - UPDATED'
+WHERE [Name] = N'Michael Sidorov'
+REVERT;
+```
+
+| ID | Name | Classification |
+| :--- | :--- | :--- |
+| 1 | Ivan Ivanov | SECRET |
+| 3 | Michael Sidorov - UPDATED | SECRET |
+
+```tsql
+EXECUTE AS USER = 'Alex';
+SELECT * FROM [dbo].[Information]
+REVERT;
+```
+
+| ID | Name | Classification |
+| :--- | :--- | :--- |
+
+#### Часть B. Задание 2
+```tsql
+-- Инициализация тестовых и прочих данных
+CREATE TABLE [Roles](
+	[Role] NVARCHAR(75) PRIMARY KEY NOT NULL,
+	[Clearance] NVARCHAR(75) NOT NULL
+)
+INSERT INTO [Roles]([Role], [Clearance])
+VALUES
+(N'LowRole',N'UNCLASSIFIED'),
+(N'MediumRole',N'SECRET'),
+(N'HighRole',N'TOP SECRET')
+
+ALTER ROLE [LowRole] ADD MEMBER [Alex]
+ALTER ROLE [HighRole] ADD MEMBER [Anna]
+```
+
+```tsql
+-- Функция для проверки разрешения на строку для пользователя (на основе ролей)
+CREATE OR ALTER FUNCTION Security.fn_CheckInformationAccessByRole(@Classification AS NVARCHAR(75))
+RETURNS TABLE
+AS
+RETURN
+SELECT 1 AS fn_result
+WHERE (
+    -- Получить максимальный уровень доступа текущего пользователя.
+    (SELECT MAX(AccessLevel.[Level])
+     FROM [dbo].[AccessLevel] AS AccessLevel
+     JOIN [dbo].[Roles] Roles ON AccessLevel.[Label] = Roles.[Clearance]
+     JOIN sys.database_role_members RoleMembers ON Roles.[Role] = (
+        SELECT name
+        FROM sys.database_principals
+        WHERE principal_id = RoleMembers.role_principal_id
+     )
+     JOIN sys.database_principals Principals ON RoleMembers.member_principal_id = Principals.principal_id
+     WHERE Principals.[name] = CURRENT_USER)
+    >=
+    -- Получить уровень доступа для заданной строки
+    (SELECT [Level]
+     FROM [dbo].[AccessLevel] AS AccessLevel
+     WHERE AccessLevel.[Label] = @Classification)
+)
+```
+
+```tsql
+-- Создание политики безопасности с применением предиката безопасности для таблицы
+CREATE SECURITY POLICY Security.Information_RLS_Role_Policy
+ADD FILTER PREDICATE Security.fn_CheckInformationAccessByRole([Classification])
+ON [dbo].[Information]
+WITH (STATE=ON, SCHEMABINDING=OFF)
+
+GRANT SELECT ON [Security].[fn_CheckInformationAccessByRole] to [Пользователь]
+```
+
+Тестирование:
+```tsql
+EXECUTE AS USER = 'Anna';
+SELECT * FROM [dbo].[Information]; -- запрос выполняется от имени пользователя Anna
+REVERT;
+```
+
+| ID | Name | Classification |
+| :--- | :--- | :--- |
+| 1 | Ivan Ivanov | SECRET |
+| 2 | Peter Petrov | TOP SECRET |
+| 3 | Michael Sidorov - UPDATED | SECRET |
+
+
+```tsql
+EXECUTE AS USER = 'Alex';
+SELECT * FROM [dbo].[Information]; -- запрос выполняется от имени пользователя Alex
+REVERT;
+```
+
+| ID | Name | Classification |
+| :--- | :--- | :--- |
 
