@@ -5,6 +5,7 @@
   <a href="#-lab2"><img alt="lab2" src="https://img.shields.io/badge/Lab2-red"></a>
   <a href="#-lab3"><img alt="lab3" src="https://img.shields.io/badge/Lab3-green"></a>
   <a href="#-lab4"><img alt="lab4" src="https://img.shields.io/badge/Lab4-yellow"></a>
+  <a href="#-lab5"><img alt="lab5" src="https://img.shields.io/badge/Lab5-gray"></a>
 </p>
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab1
@@ -938,6 +939,181 @@ AND B.[B_DATETIME] < '2003-01-01';
 | :--- |
 | Square # 22 |
 
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab5
+<h3 align="center">
+  <a href="#client"></a>
+  Маскирование данных
+</h3>
 
+#### Часть A. 
+
+```tsql
+-- Создание тестовой таблицы
+CREATE TABLE [dbo].OriginalTable(
+    Id INT PRIMARY KEY,
+    Name NVARCHAR(100),
+    Email NVARCHAR(100)
+);
+
+-- Вставка тестовых данных
+INSERT INTO [dbo].OriginalTable (Id, Name, Email)
+VALUES
+(1, 'John Doe', 'john.doe@example.com'),
+(2, 'Jane Smith', 'jane.smith@example.com');
+
+-- Создание вспомогательной таблицы для отслеживания статусов маскировки
+CREATE TABLE MaskingSettings (
+    FieldName VARCHAR(75) PRIMARY KEY,
+    MaskingEnabled BIT DEFAULT 0
+);
+
+-- Инициализация начальных данных о маскировке
+INSERT INTO MaskingSettings (FieldName, MaskingEnabled)
+VALUES
+('Name', 0),
+('Email', 0);
+```
+
+```tsql
+-- Функция маскирования
+-- Принимает символьное значение и возвращает замаскированную строку(замена всех символов звездочками (*).
+-- *Если входное значение NULL, функция также вернет NULL.
+CREATE OR ALTER FUNCTION [dbo].MaskData(@input NVARCHAR(MAX))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    RETURN CASE
+        WHEN @input IS NULL THEN NULL
+        ELSE REPLICATE('*', LEN(@input))
+    END
+END
+GO
+
+-- Представление для работы с замаскированными данными вместо оригинальных.
+CREATE VIEW dbo.MaskedView
+AS
+SELECT
+    Id,
+    [dbo].MaskData(Name) AS Name,
+    [dbo].MaskData(Email) AS Email
+FROM [dbo].OriginalTable
+GO
+
+-- Функция для включения/отключения маскирования для указанных полей
+CREATE OR ALTER PROCEDURE dbo.ToggleMasking
+    @FieldNames NVARCHAR(MAX),
+    @EnableMasking BIT
+AS
+BEGIN
+    DECLARE @SQL NVARCHAR(MAX);
+    DECLARE @FieldList NVARCHAR(MAX) = '';
+    DECLARE @TableName NVARCHAR(MAX) = 'OriginalTable';
+
+    -- Создание временной таблицы для хранения имен полей
+    DECLARE @Fields TABLE (FieldName NVARCHAR(100));
+
+    -- Заполнение временной таблицы списком полей
+    INSERT INTO @Fields (FieldName)
+    SELECT TRIM(value)
+    FROM STRING_SPLIT(@FieldNames, ',');
+
+    -- Обновление статусов маскировки в таблице MaskingSettings
+    UPDATE MaskingSettings
+    SET MaskingEnabled = @EnableMasking
+    WHERE FieldName IN (SELECT FieldName FROM @Fields);
+
+    -- Получение списка всех полей из таблицы dbo.OriginalTable
+    SELECT @FieldList = STRING_AGG(
+        CASE
+            WHEN ms.MaskingEnabled = 1 THEN 'dbo.MaskData(' + c.COLUMN_NAME + ') AS ' + c.COLUMN_NAME
+            ELSE c.COLUMN_NAME
+        END, ', ')
+    FROM INFORMATION_SCHEMA.COLUMNS c
+    LEFT JOIN MaskingSettings ms ON c.COLUMN_NAME = ms.FieldName
+    WHERE c.TABLE_NAME = @TableName;
+
+    -- Создание представления с динамически построенным списком полей
+    SET @SQL = 'CREATE OR ALTER VIEW dbo.MaskedView AS SELECT ' + @FieldList + ' FROM ' + @TableName;
+
+    -- Выполнение динамического SQL-запроса
+    EXEC sp_executesql @SQL;
+END
+GO
+```
+
+```tsql
+-- Вывод изначальных данных из представления с маскированием
+SELECT * FROM dbo.MaskedView;
+```
+
+| Id | Name | Email |
+| :--- | :--- | :--- |
+| 1 | John Doe | john.doe@example.com |
+| 2 | Jane Smith | jane.smith@example.com |
+
+
+```tsql
+-- Включение маскирования для поля Name
+EXEC dbo.ToggleMasking @FieldNames = 'Name', @EnableMasking = 1;
+-- Проверка данных после включения маскирования
+SELECT * FROM dbo.MaskedView;
+```
+
+| Id | Name | Email |
+| :--- | :--- | :--- |
+| 1 | \*\*\*\*\*\*\*\* | john.doe@example.com |
+| 2 | \*\*\*\*\*\*\*\*\*\* | jane.smith@example.com |
+
+
+```tsql
+-- Включение маскирования для поля Email
+EXEC dbo.ToggleMasking @FieldNames = 'Email', @EnableMasking = 1;
+-- Проверка данных после включения маскирования
+SELECT * FROM dbo.MaskedView;
+```
+
+| Id | Name | Email |
+| :--- | :--- | :--- |
+| 1 | \*\*\*\*\*\*\*\* | \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\* |
+| 2 | \*\*\*\*\*\*\*\*\*\* | \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\* |
+
+
+```tsql
+-- Отключение маскирования для поля Email
+EXEC dbo.ToggleMasking @FieldNames = 'Email', @EnableMasking = 0;
+-- Проверка данных после отключения маскирования
+SELECT * FROM dbo.MaskedView;
+```
+
+| Id | Name | Email |
+| :--- | :--- | :--- |
+| 1 | \*\*\*\*\*\*\*\* | john.doe@example.com |
+| 2 | \*\*\*\*\*\*\*\*\*\* | jane.smith@example.com |
+
+
+```tsql
+-- Включение маскирования для полей Name и Email одной командой
+EXEC dbo.ToggleMasking @FieldNames = 'Name,Email', @EnableMasking = 1;
+-- Проверка данных после включения маскирования
+SELECT * FROM dbo.MaskedView;
+```
+
+| Id | Name | Email |
+| :--- | :--- | :--- |
+| 1 | \*\*\*\*\*\*\*\* | \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\* |
+| 2 | \*\*\*\*\*\*\*\*\*\* | \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\* |
+
+
+```tsql
+-- Отключение маскирования для полей Name и Email одной командой
+EXEC dbo.ToggleMasking @FieldNames = 'Name,Email', @EnableMasking = 0;
+-- Проверка данных после отключения маскирования
+SELECT * FROM dbo.MaskedView;
+```
+
+| Id | Name | Email |
+| :--- | :--- | :--- |
+| 1 | John Doe | john.doe@example.com |
+| 2 | Jane Smith | jane.smith@example.com |
 
 
