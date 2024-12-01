@@ -808,7 +808,30 @@ FROM [dbo].[SquaresNodesGraphTable] Q,
 WHERE MATCH (Q-(B)->V)
 AND V.[V_COLOR] = 'R'
 GROUP BY Q.Q_ID
+```
 
+| Q\_ID | SUM\_VOL |
+| :--- | :--- |
+| 1 | 255 |
+| 2 | 255 |
+| 3 | 255 |
+| 4 | 255 |
+| 5 | 255 |
+| 6 | 255 |
+| 7 | 255 |
+| 8 | 50 |
+| 9 | 255 |
+| 10 | 255 |
+| 11 | 255 |
+| 12 | 255 |
+| 14 | 50 |
+| 15 | 100 |
+| 17 | 20 |
+| 19 | 20 |
+| 21 | 100 |
+
+
+```tsql
 --2. Найти квадраты, которые окрашивались как красной, так и синей краской. Вывести: название квадрата.
 SELECT DISTINCT Q.[Q_NAME]
 FROM [dbo].[SquaresNodesGraphTable] Q,
@@ -819,7 +842,24 @@ FROM [dbo].[SquaresNodesGraphTable] Q,
 WHERE MATCH (Q-(B1)->V1 AND Q-(B2)->V2)
 AND V1.[V_COLOR] = 'R'
 AND V2.[V_COLOR] = 'B'
+```
 
+| Q\_NAME |
+| :--- |
+| Square # 01 |
+| Square # 02 |
+| Square # 03 |
+| Square # 05 |
+| Square # 06 |
+| Square # 07 |
+| Square # 09 |
+| Square # 10 |
+| Square # 11 |
+| Square # 12 |
+| Square # 14 |
+
+
+```tsql
 --3. Найти квадраты, которые окрашивались всеми тремя цветами.
 SELECT DISTINCT Q.[Q_NAME]
 FROM [dbo].[SquaresNodesGraphTable] Q,
@@ -833,7 +873,22 @@ WHERE
 MATCH (Q-(B1)->V1) AND V1.[V_COLOR] = 'R'
 AND MATCH (Q-(B2)->V2) AND V2.[V_COLOR] = 'G'
 AND MATCH (Q-(B3)->V3) AND V3.[V_COLOR] = 'B'
+```
 
+| Q\_NAME |
+| :--- |
+| Square # 01 |
+| Square # 02 |
+| Square # 03 |
+| Square # 05 |
+| Square # 06 |
+| Square # 07 |
+| Square # 09 |
+| Square # 10 |
+| Square # 11 |
+| Square # 12 |
+
+```tsql
 --4. Найти баллончики, которыми окрашивали более одного квадрата.
 SELECT DISTINCT V.[V_NAME]
 FROM [dbo].[SquaresNodesGraphTable] Q1,
@@ -845,6 +900,26 @@ WHERE MATCH (Q1-(B1)->V)
 AND MATCH (Q2-(B2)->V)
 AND Q1.$node_id <> Q2.$node_id
 ```
+
+| V\_NAME |
+| :--- |
+| Balloon # 10 |
+| Balloon # 17 |
+| Balloon # 25 |
+| Balloon # 26 |
+| Balloon # 31 |
+| Balloon # 32 |
+| Balloon # 33 |
+| Balloon # 34 |
+| Balloon # 35 |
+| Balloon # 36 |
+| Balloon # 39 |
+| Balloon # 42 |
+| Balloon # 44 |
+| Balloon # 45 |
+| Balloon # 46 |
+| Balloon # 50 |
+
 
 #### Часть A. Задание 2
 
@@ -858,5 +933,11 @@ FROM [dbo].[SquaresNodesGraphTable] Q,
 WHERE MATCH (Q-(B)->V)
 AND B.[B_DATETIME] < '2003-01-01';
 ```
+
+| Q\_NAME |
+| :--- |
+| Square # 22 |
+
+
 
 
