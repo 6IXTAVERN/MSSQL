@@ -3,6 +3,8 @@
 <p align="center">
   <a href="#-lab1"><img alt="lab1" src="https://img.shields.io/badge/Lab1-blue"></a> 
   <a href="#-lab2"><img alt="lab2" src="https://img.shields.io/badge/Lab2-red"></a>
+  <a href="#-lab3"><img alt="lab3" src="https://img.shields.io/badge/Lab3-green"></a>
+  <a href="#-lab4"><img alt="lab4" src="https://img.shields.io/badge/Lab4-yellow"></a>
 </p>
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab1
@@ -515,12 +517,6 @@ SELECT * FROM SampleTable;
 | 3 | Goodbye | EveryoneGoodbye |
 | 4 | null | null |
 
-
-<p align="center">
-  <a href="#-lab1"><img alt="lab1" src="https://img.shields.io/badge/Lab1-blue"></a> 
-  <a href="#-lab2"><img alt="lab2" src="https://img.shields.io/badge/Lab2-red"></a>
-</p>
-
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab3
 <h3 align="center">
   <a href="#client"></a>
@@ -756,4 +752,111 @@ REVERT;
 
 | ID | Name | Classification |
 | :--- | :--- | :--- |
+
+
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab4
+<h3 align="center">
+  <a href="#client"></a>
+   Графы
+</h3>
+
+```tsql
+USE painting
+
+-- Начальная инициализация
+
+CREATE TABLE SquaresNodesGraphTable (
+    [Q_ID] int NOT NULL,
+    [Q_NAME] varchar(35) NOT NULL
+) AS NODE
+
+CREATE TABLE PaintBallonNodesGraphTable(
+    [V_ID] int NOT NULL,
+    [V_NAME] varchar(35) NOT NULL,
+    [V_COLOR] char(1) NOT NULL
+) AS NODE
+
+CREATE TABLE PaintVolumeInfoEdgeGraphTable (
+    [B_DATETIME] datetime NOT NULL,
+    [B_VOLUME] tinyint NOT NULL
+) AS EDGE
+
+INSERT INTO SquaresNodesGraphTable
+SELECT [Q_ID], [Q_NAME]
+FROM [dbo].[utQ]
+
+INSERT INTO PaintBallonNodesGraphTable
+SELECT [V_ID], [V_NAME],[V_COLOR]
+FROM [dbo].[utV]
+
+INSERT INTO PaintVolumeInfoEdgeGraphTable($from_id, $to_id, [B_DATETIME],[B_VOLUME])
+SELECT Q.$node_id, V.$node_id, B.B_DATETIME, B.B_VOL
+FROM [dbo].[SquaresNodesGraphTable] Q JOIN [dbo].[utB] B
+ON Q.Q_ID = B.B_Q_ID
+JOIN [dbo].[PaintBallonNodesGraphTable] V
+ON B.B_V_ID = V.V_ID
+```
+
+#### Часть A. Задание 1
+
+```tsql
+-- 1. Найти квадраты, которые окрашивались красной краской. Вывести идентификатор квадрата и объем красной краски.
+SELECT DISTINCT Q.Q_ID, SUM(B.[B_VOLUME]) SUM_VOL
+FROM [dbo].[SquaresNodesGraphTable] Q,
+     [dbo].[PaintVolumeInfoEdgeGraphTable] B,
+     [dbo].[PaintBallonNodesGraphTable] V
+WHERE MATCH (Q-(B)->V)
+AND V.[V_COLOR] = 'R'
+GROUP BY Q.Q_ID
+
+--2. Найти квадраты, которые окрашивались как красной, так и синей краской. Вывести: название квадрата.
+SELECT DISTINCT Q.[Q_NAME]
+FROM [dbo].[SquaresNodesGraphTable] Q,
+     [dbo].[PaintVolumeInfoEdgeGraphTable] B1,
+     [dbo].[PaintBallonNodesGraphTable] V1,
+	 [dbo].[PaintVolumeInfoEdgeGraphTable] B2,
+     [dbo].[PaintBallonNodesGraphTable] V2
+WHERE MATCH (Q-(B1)->V1 AND Q-(B2)->V2)
+AND V1.[V_COLOR] = 'R'
+AND V2.[V_COLOR] = 'B'
+
+--3. Найти квадраты, которые окрашивались всеми тремя цветами.
+SELECT DISTINCT Q.[Q_NAME]
+FROM [dbo].[SquaresNodesGraphTable] Q,
+     [dbo].[PaintVolumeInfoEdgeGraphTable] B1,
+     [dbo].[PaintBallonNodesGraphTable] V1,
+	 [dbo].[PaintVolumeInfoEdgeGraphTable] B2,
+     [dbo].[PaintBallonNodesGraphTable] V2,
+	 [dbo].[PaintVolumeInfoEdgeGraphTable] B3,
+     [dbo].[PaintBallonNodesGraphTable] V3
+WHERE
+MATCH (Q-(B1)->V1) AND V1.[V_COLOR] = 'R'
+AND MATCH (Q-(B2)->V2) AND V2.[V_COLOR] = 'G'
+AND MATCH (Q-(B3)->V3) AND V3.[V_COLOR] = 'B'
+
+--4. Найти баллончики, которыми окрашивали более одного квадрата.
+SELECT DISTINCT V.[V_NAME]
+FROM [dbo].[SquaresNodesGraphTable] Q1,
+     [dbo].[PaintVolumeInfoEdgeGraphTable] B1,
+     [dbo].[PaintBallonNodesGraphTable] V,
+	 [dbo].[SquaresNodesGraphTable] Q2,
+     [dbo].[PaintVolumeInfoEdgeGraphTable] B2
+WHERE MATCH (Q1-(B1)->V)
+AND MATCH (Q2-(B2)->V)
+AND Q1.$node_id <> Q2.$node_id
+```
+
+#### Часть A. Задание 2
+
+```tsql
+--5. Кастомный запрос
+-- Найти квадраты, которые красили до начала 2003 года
+SELECT DISTINCT Q.[Q_NAME]
+FROM [dbo].[SquaresNodesGraphTable] Q,
+     [dbo].[PaintVolumeInfoEdgeGraphTable] B,
+     [dbo].[PaintBallonNodesGraphTable] V
+WHERE MATCH (Q-(B)->V)
+AND B.[B_DATETIME] < '2003-01-01';
+```
+
 
