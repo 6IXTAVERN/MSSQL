@@ -6,6 +6,7 @@
   <a href="#-lab3"><img alt="lab3" src="https://img.shields.io/badge/Lab3-green"></a>
   <a href="#-lab4"><img alt="lab4" src="https://img.shields.io/badge/Lab4-yellow"></a>
   <a href="#-lab5"><img alt="lab5" src="https://img.shields.io/badge/Lab5-gray"></a>
+  <a href="#-lab6"><img alt="lab6" src="https://img.shields.io/badge/Lab6-orange"></a> 
 </p>
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab1
@@ -1116,4 +1117,152 @@ SELECT * FROM dbo.MaskedView;
 | 1 | John Doe | john.doe@example.com |
 | 2 | Jane Smith | jane.smith@example.com |
 
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab6
+<h3 align="center">
+  <a href="#client"></a>
+  Задание 1.
+</h3>
 
+```tsql
+USE Lab6;
+
+-- Создание роли DevUserRole, присвоение к db_datareader и db_datawriter
+CREATE ROLE DevUserRole
+ALTER ROLE db_datareader ADD MEMBER DevUserRole
+ALTER ROLE db_datawriter ADD MEMBER DevUserRole
+
+-- Создание пользователя для роли DevUserRole
+CREATE USER DevUser WITHOUT LOGIN WITH DEFAULT_SCHEMA=[dbo]
+ALTER ROLE DevUserRole ADD MEMBER DevUser
+
+-- TEST: создание тестовой процедуры
+CREATE OR ALTER PROCEDURE MyProcedure1
+AS
+BEGIN
+    SELECT 1
+END
+```
+
+```tsql
+-- TEST: попытка взаимодействия с процедурой
+EXECUTE AS USER = 'DevUser'
+EXEC MyProcedure1
+REVERT
+```
+
+![1](https://github.com/user-attachments/assets/1c3f4bbb-0b35-4efb-9b08-296c2caf643d)
+
+```tsql
+-- Скрипт для выдачи прав на все существующие хранимые процедуры
+DECLARE @sql_query NVARCHAR(MAX)
+SET @sql_query = (
+    SELECT STRING_AGG(
+        'GRANT EXECUTE ON ' +
+        QUOTENAME(SCHEMA_NAME(schema_id)) + '.' + QUOTENAME(name) +
+        ' TO DevUserRole', CHAR(13)
+    )
+    FROM sys.objects
+    WHERE type = 'P'
+)
+EXEC sp_executesql @sql_query
+```
+
+```tsql
+-- TEST: попытка взаимодействия с процедурой
+EXECUTE AS USER = 'DevUser'
+EXEC MyProcedure1
+REVERT
+```
+
+![2](https://github.com/user-attachments/assets/20677b58-9219-4818-9aa4-7d7dd88bc37a)
+
+```tsql
+-- Триггер для автоматической выдачи прав на выполнение всех вновь создаваемых в схеме dbo процедур для роли DevUserRole
+CREATE OR ALTER TRIGGER AutoGrantExecuteOnCreateProcedure
+ON DATABASE FOR CREATE_PROCEDURE
+AS
+BEGIN
+    DECLARE @schema_name NVARCHAR(128)
+    DECLARE @procedure_name NVARCHAR(128)
+    DECLARE @sql_query NVARCHAR(MAX)
+    SET @schema_name = EVENTDATA().value('(/EVENT_INSTANCE/SchemaName)[1]', 'NVARCHAR(128)')
+    SET @procedure_name = EVENTDATA().value('(/EVENT_INSTANCE/ObjectName)[1]', 'NVARCHAR(128)')
+
+    IF @schema_name = 'dbo'
+    BEGIN
+        SET @sql_query = 'GRANT EXECUTE ON ' +
+                         QUOTENAME(@schema_name) + '.' + QUOTENAME(@procedure_name) +
+                         ' TO DevUserRole'
+        EXEC sp_executesql @sql_query
+    END
+END
+```
+
+```tsql
+-- Создание новой процедуры
+CREATE PROCEDURE MyProcedure2
+AS
+BEGIN
+    SELECT 2
+END
+
+-- TEST: попытка взаимодействия с процедурой
+EXECUTE AS USER = 'DevUser'
+EXEC MyProcedure2
+REVERT
+```
+
+![3](https://github.com/user-attachments/assets/f4e18c39-0014-4a72-bcda-9a549e1a3ac4)
+
+
+<h3 align="center">
+  <a href="#client"></a>
+  Задание 2.
+</h3>
+
+```tsql
+USE master;
+
+-- Создание логина для авторизации
+CREATE LOGIN TestAdmin WITH PASSWORD = N'root';
+
+-- Создание таблицы с логами авторизаций
+CREATE TABLE [LogAuditTestAdmin] (
+    [LogID] INT IDENTITY(1,1) PRIMARY KEY,
+    [IPAddress] NVARCHAR(30),
+    [DateTime] DATETIME NOT NULL DEFAULT GETDATE(),
+    [Status] NVARCHAR(50),
+    [LoginName] NVARCHAR(50)
+)
+
+-- Выдача нужных прав
+GRANT INSERT ON [master].[dbo].[LogAuditTestAdmin] TO public
+GRANT CONNECT TO public
+
+-- Создание триггера для ограничения авторизации и логгирования
+CREATE OR ALTER TRIGGER AuditTestAdminTrigger
+ON ALL SERVER FOR LOGON
+AS
+DECLARE @login_name NVARCHAR(50) = ORIGINAL_LOGIN();
+IF @login_name = N'TestAdmin'
+BEGIN
+    DECLARE @current_time TIME = CONVERT(TIME, GETDATE());
+    DECLARE @allowed_start_time TIME = '19:45:00';
+    DECLARE @allowed_end_time TIME = '23:20:00';
+    DECLARE @ip_address NVARCHAR(30) = EVENTDATA().value('(/EVENT_INSTANCE/ClientHost)[1]', 'NVARCHAR(30)');
+
+    IF (@current_time BETWEEN @allowed_start_time AND @allowed_end_time) AND @ip_address = N'<local machine>'
+    BEGIN
+        INSERT INTO [LogAuditTestAdmin] ([IPAddress], [DateTime], [Status], [LoginName])
+        VALUES (@ip_address, GETDATE(), N'Success', @login_name);
+    END
+    ELSE
+    BEGIN
+        ROLLBACK
+        INSERT INTO [LogAuditTestAdmin] ([IPAddress], [DateTime], [Status], [LoginName])
+        VALUES (@ip_address, GETDATE(), N'Fail', @login_name);
+    END
+END
+```
+
+![4](https://github.com/user-attachments/assets/368c019d-d54f-4771-8a1c-6c6dc5a44924)
