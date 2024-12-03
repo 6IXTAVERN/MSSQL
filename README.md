@@ -1266,3 +1266,76 @@ END
 ```
 
 ![4](https://github.com/user-attachments/assets/368c019d-d54f-4771-8a1c-6c6dc5a44924)
+
+
+<h3 align="center">
+  <a href="#client"></a>
+  Задание 3.
+</h3>
+
+```cs
+// Код .dll сборки
+using Microsoft.SqlServer.Server;
+using System.Data.SqlClient;
+using System.Xml;
+
+public class Main
+{
+    public static void CLR_Trigger()
+    {
+        string event_data_serialized = SqlContext.TriggerContext.EventData.Value;
+        XmlDocument event_data = new XmlDocument();
+        event_data.LoadXml(event_data_serialized);
+        XmlNode object_node = event_data.SelectSingleNode("/EVENT_INSTANCE/ObjectName");
+        string table_name = object_node.InnerText;
+        using (var sql_connect = new SqlConnection("context connection=true"))
+        {
+            sql_connect.Open();
+            var trigger = new SqlCommand(
+                $"CREATE OR ALTER TRIGGER TriggerFor{tableName} " +
+                $"ON {tableName} " +
+                $"AFTER INSERT " +
+                $"AS " +
+                $"BEGIN " +
+                $"PRINT 'Trigger executed by table: {tableName}'; " +
+                $"END;", sqlCnn
+            );
+            trigger.ExecuteNonQuery();
+        }
+    }
+}
+
+
+```
+
+```tsql
+-- Вкл. поддержки CLR
+EXEC sp_configure 'clr enabled', 1
+-- Вкл. расширенных параметров конфигурации
+EXEC sp_configure 'show advanced options', 1
+-- Выкл. строгой безопасности для CLR сборок
+EXEC sp_configure 'clr strict security', 0
+RECONFIGURE
+
+-- Создание CLR сборки из .dll файла
+CREATE ASSEMBLY [CLR] FROM 'C:\\CLR\Trigger.dll' WITH PERMISSION_SET=SAFE
+
+-- Создание триггера на основе CLR сборки
+CREATE TRIGGER MyTrigger
+ON DATABASE
+FOR CREATE_TABLE
+AS EXTERNAL NAME [CLR].Main.[CLR_Trigger]
+
+-- Создание тестовой таблицы
+CREATE TABLE MyTable
+(
+	[ID] INT IDENTITY(1,1) PRIMARY KEY,
+	[myName] NVARCHAR(128) NULL
+)
+
+-- Вставка тестового элемента
+INSERT INTO MyTable([myName])
+VALUES('Stepan')
+```
+
+![5](https://github.com/user-attachments/assets/056e8804-6a43-4540-a6d8-f2afe4032dd5)
