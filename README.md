@@ -7,6 +7,7 @@
   <a href="#-lab4"><img alt="lab4" src="https://img.shields.io/badge/Lab4-yellow"></a>
   <a href="#-lab5"><img alt="lab5" src="https://img.shields.io/badge/Lab5-gray"></a>
   <a href="#-lab6"><img alt="lab6" src="https://img.shields.io/badge/Lab6-orange"></a> 
+  <a href="#-lab6"><img alt="lab6" src="https://img.shields.io/badge/Lab7-brown"></a> 
 </p>
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab1
@@ -1339,3 +1340,265 @@ VALUES('Stepan')
 ```
 
 ![5](https://github.com/user-attachments/assets/056e8804-6a43-4540-a6d8-f2afe4032dd5)
+
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab7
+<h3 align="center">
+  <a href="#client"></a>
+  Шифрование
+</h3>
+
+```tsql
+-- Инициализация ролей и пользователей для них
+CREATE ROLE Operator;
+CREATE ROLE Registrar;
+CREATE ROLE Chief;
+GO
+
+-- Создаем пользователя для роли Operator
+CREATE LOGIN TestOperator WITH PASSWORD = 'StrongTestPassword';
+GO
+USE PersonalDataDB;
+GO
+CREATE USER TestOperator FOR LOGIN TestOperator;
+GO
+-- Назначаем роль Operator
+EXEC sp_addrolemember 'Operator', 'TestOperator';
+GO
+
+-- Создание пользователя для роли Chief
+CREATE LOGIN TestChief WITH PASSWORD = 'StrongChiefPassword';
+GO
+USE PersonalDataDB;
+GO
+CREATE USER TestChief FOR LOGIN TestChief;
+GO
+
+-- Назначаем роль Chief
+EXEC sp_addrolemember 'Chief', 'TestChief';
+GO
+```
+
+Часть 1. TDE (Transparrent Data Encryption)
+```tsql
+-- Создание главного ключа и сертификата
+USE master;
+GO
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'strong';
+GO
+CREATE CERTIFICATE MyServerCertificate WITH SUBJECT = 'MyDatabaseEncryptionKeyCertificate';
+GO
+-- Включение TDE
+USE PersonalDataDB;
+GO
+CREATE DATABASE ENCRYPTION KEY
+WITH ALGORITHM = AES_256
+ENCRYPTION BY SERVER CERTIFICATE MyServerCertificate;
+GO
+ALTER DATABASE PersonalDataDB
+SET ENCRYPTION ON;
+GO
+```
+
+```tsql
+-- Проверка состояния шифрования
+SELECT d.name AS database_name, k.*
+FROM sys.dm_database_encryption_keys k
+JOIN sys.databases d ON k.database_id = d.database_id;
+-- encryption_state == 3 -> база данных зашифрована и активна
+```
+
+| database\_name | database\_id | encryption\_state | create\_date | regenerate\_date | modify\_date | set\_date | opened\_date | key\_algorithm | key\_length | encryptor\_thumbprint | encryptor\_type | percent\_complete | encryption\_state\_desc | encryption\_scan\_state | encryption\_scan\_state\_desc | encryption\_scan\_modify\_date |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| tempdb | 2 | 3 | 2024-12-07 09:32:57.833 | 2024-12-07 09:32:57.833 | 2024-12-07 09:32:57.833 | 1900-01-01 00:00:00.000 | 2024-12-07 09:32:57.833 | AES | 256 | com.intellij.database.extractors.TextInfo@95cc24cf | ASYMMETRIC KEY | 0 | ENCRYPTED | 4 | COMPLETE | 2024-12-07 09:32:57.833 |
+| PersonalDataDB | 12 | 3 | 2024-12-07 09:32:57.817 | 2024-12-07 09:32:57.817 | 2024-12-07 09:32:57.817 | 2024-12-07 09:32:57.830 | 2024-12-07 09:32:57.817 | AES | 256 | 0xFD15294AA3A25982E3106407F5B196B24CBB7F2F | CERTIFICATE | 0 | ENCRYPTED | 4 | COMPLETE | 2024-12-07 09:32:57.893 |
+
+
+```tsql
+SELECT name, is_encrypted
+FROM sys.databases
+WHERE name = 'PersonalDataDB';
+```
+
+| name | is\_encrypted |
+| :--- | :--- |
+| PersonalDataDB | true |
+
+
+Часть 2. CLE (Column-Level Encryption)
+
+А) С использованием парольной фразы
+```tsql
+-- Добавление столбца EncryptedCity
+ALTER TABLE Addresses ADD EncryptedCity VARBINARY(MAX);
+GO
+
+-- Создание процедуры для шифрования
+CREATE OR ALTER PROCEDURE EncryptCity
+AS
+BEGIN
+    DECLARE @Passphrase NVARCHAR(128) = 'stepan1';
+    UPDATE Addresses
+    SET EncryptedCity = ENCRYPTBYPASSPHRASE(@Passphrase, City)
+END;
+GO
+
+-- Выполнение процедуры шифрования
+EXEC EncryptCity;
+GO
+```
+
+```tsql
+-- Создание процедуры для дешифрования данных поля EncryptCity
+CREATE OR ALTER PROCEDURE DecryptCity
+AS
+BEGIN
+    DECLARE @Passphrase NVARCHAR(128) = 'stepan1';
+    IF IS_ROLEMEMBER('Operator') = 1
+    BEGIN
+        -- Дешифрование для пользователей с ролью Operator
+        SELECT AddressID, PersonID, Street, State, ZipCode,
+               CONVERT(NVARCHAR(MAX), DECRYPTBYPASSPHRASE(@Passphrase, EncryptedCity)) AS [City(*decrypted)]
+        FROM Addresses;
+    END
+    ELSE
+    BEGIN
+        -- Отображение зашифрованных данных для всех остальных пользователей
+        SELECT AddressID, PersonID, Street, State, ZipCode, EncryptedCity
+        FROM Addresses;
+    END
+END;
+GO
+
+-- Установка прав доступа к процедуре
+GRANT EXECUTE ON DecryptCity TO PUBLIC;
+GO
+```
+
+Тестирование DecryptCity
+![6](https://github.com/user-attachments/assets/3c9013a1-5423-449b-ac9b-1af7e19cfbf7)
+
+
+B) С использованием ассиметричного ключа
+```tsql
+-- Добавление колонки EncryptedFirstName в таблицу Persons
+ALTER TABLE Persons ADD EncryptedFirstName VARBINARY(MAX);
+GO
+
+-- Создание асимметричного ключа
+USE PersonalDataDB;
+GO
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'StrongMasterKeyPassword';
+GO
+CREATE ASYMMETRIC KEY MyAsymKey
+WITH ALGORITHM = RSA_2048;
+GO
+
+-- Выдача прав на контроль ассиметричного ключа для роли
+GRANT CONTROL ON ASYMMETRIC KEY::MyAsymKey TO Chief;
+GO
+
+-- Проверка существования ассиметричного ключа
+SELECT * FROM sys.asymmetric_keys;
+```
+
+| name | principal\_id | asymmetric\_key\_id | pvt\_key\_encryption\_type | pvt\_key\_encryption\_type\_desc | thumbprint | algorithm | algorithm\_desc | key\_length | sid | string\_sid | public\_key | attested\_by | provider\_type | cryptographic\_provider\_guid | cryptographic\_provider\_algid |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| MyAsymKey | 1 | 260 | MK | ENCRYPTED\_BY\_MASTER\_KEY | 0xFE0E0BFE5D170B6B | 3R | RSA\_2048 | 2048 | 0x010300000000000902000000FE0E0BFE5D170B6B | S-1-9-2-4262137598-1795888989 | 0x0602000000240000525341310008000001000100CD9C05958DC2B32412AC553F7A3008A0BCB2ECE50EA1EABF36A8CE300E74A14B44DF8AC008BB7CCD6206578DA78FC867EC843F22DAB741EBF2E38E9460614F491BB1D9C54BE209D875A95D675E058086B6BAD2954750EB83DBD58FDF14CA751511D4EF15CA5AE14EA3F8EFDC91BA473D0578528E2B0788A42E1509A243ED922500CC59DB6DD08E7F481354281BA11C7176FDDBA45247556C4D56E2F79DE2ECC65F8A062F7A14A0B46806D662D63073076C16E7C25C715CE1DF6E09ABAC006CBDEF2BD2907B4A71BB9C4A13C7C2932EE74CE5A90FEA8A8627A1930E1131D92A237A4F4695CA0A91D561E12FBB3886D71DC4C54B1CA43240A819A0757F087B05BD | null | null | null | null |
+
+```tsql
+-- Создание процедуры для шифрования
+CREATE OR ALTER PROCEDURE EncryptFirstName
+AS
+BEGIN
+    UPDATE Persons
+    SET EncryptedFirstName = ENCRYPTBYASYMKEY(ASYMKEY_ID('MyAsymKey'), FirstName);
+END;
+GO
+-- Выполнение процедуры шифрования
+EXEC EncryptFirstName;
+GO
+
+-- Создание процедуры для дешифрования данных
+CREATE OR ALTER PROCEDURE DecryptFirstName
+AS
+BEGIN
+    -- Проверка роли пользователя
+    IF IS_ROLEMEMBER('Chief') = 1
+    BEGIN
+        SELECT PersonID,
+               CONVERT(NVARCHAR(128), DECRYPTBYASYMKEY(ASYMKEY_ID('MyAsymKey'), EncryptedFirstName)) AS [FirstName(*decrypted)],
+               LastName,
+               DateOfBirth,
+               Email
+        FROM Persons;
+    END
+    ELSE
+    BEGIN
+        SELECT PersonID, EncryptedFirstName, LastName, DateOfBirth, Email
+        FROM Persons;
+    END
+END;
+GO
+-- Установка прав доступа
+GRANT EXECUTE ON DecryptFirstName TO PUBLIC;
+GO
+```
+
+Тестирование DecryptFirstName
+![7](https://github.com/user-attachments/assets/ce5543a5-2c80-4f69-82b5-84a9e09ede9a)
+
+С) С использованием сертификата
+```tsql
+CREATE CERTIFICATE MyCertificate WITH SUBJECT = 'Encrypt LastName';
+GO
+
+-- Выдача прав на контроль сертификата для роли
+GRANT CONTROL ON CERTIFICATE::MyCertificate TO Operator;
+GO
+
+-- Добавление колонки EncryptedLastName в таблицу Persons
+ALTER TABLE Persons ADD EncryptedLastName VARBINARY(MAX);
+GO
+
+-- Создание процедуры для шифрования
+CREATE OR ALTER PROCEDURE EncryptLastName
+AS
+BEGIN
+    UPDATE Persons
+    SET EncryptedLastName = ENCRYPTBYCERT(CERT_ID('MyCertificate'), LastName);
+END;
+GO
+-- Выполнение процедуры шифрования
+EXEC EncryptLastName;
+GO
+
+-- Создание процедуры для дешифрования данных
+CREATE OR ALTER PROCEDURE DecryptLastName
+AS
+BEGIN
+    -- Проверка роли пользователя
+    IF IS_ROLEMEMBER('Operator') = 1
+    BEGIN
+        SELECT PersonID,
+               FirstName,
+               CONVERT(NVARCHAR(MAX), DECRYPTBYCERT(CERT_ID('MyCertificate'), EncryptedLastName)) AS [LastName(decrypted)],
+               DateOfBirth,
+               Email
+        FROM Persons;
+    END
+    ELSE
+    BEGIN
+        SELECT PersonID, FirstName, EncryptedLastName, DateOfBirth, Email
+        FROM Persons;
+    END
+END;
+GO
+-- Установка прав доступа
+GRANT EXECUTE ON DecryptLastName TO PUBLIC;
+GO
+```
+
+Тестирование DecryptLastName
+![8](https://github.com/user-attachments/assets/393c3d59-529b-46fc-adf7-021c09a8d3b4)
+
+
