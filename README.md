@@ -1623,8 +1623,11 @@ SELECT [DateOfBirth] FROM Persons
 | 0x01FBD16253699840DAF88169E228246C99EFDC090A6609E006FC56E124E9DC25CB6B544D32047342BD076CA2DFF6D49B5DC75997E860D0343536F923AEB3843554 |
 | 0x0179DEC841291C8BA77A50569878320CF931CB260E0F676D533FF1305382FA1209E3B1F08F9847BA2A834D995EE87AE6AA672617587B53125E9C627F51A893BA58 |
 
+B) Подключение к БД с особым параметром для просмотра зашифрованной информации
 
-B) Дешифрование столбца
+![13](https://github.com/user-attachments/assets/f0ab7dc6-e2f8-423d-97bf-e003faf1d841)
+
+С) Полная отмена шифрования столбца
 
 ![10(дешифрование столбца)](https://github.com/user-attachments/assets/a0831f54-07c6-4792-9927-f7898f3f940e)
 
