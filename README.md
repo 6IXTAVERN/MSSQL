@@ -8,6 +8,7 @@
   <a href="#-lab5"><img alt="lab5" src="https://img.shields.io/badge/Lab5-gray"></a>
   <a href="#-lab6"><img alt="lab6" src="https://img.shields.io/badge/Lab6-orange"></a> 
   <a href="#-lab7"><img alt="lab7" src="https://img.shields.io/badge/Lab7-brown"></a>
+  <a href="#-lab8"><img alt="lab8" src="https://img.shields.io/badge/Lab8-purple"></a>
   <a href="#-lab9"><img alt="lab9" src="https://img.shields.io/badge/Lab9-violet"></a> 
 </p>
 
@@ -1826,6 +1827,32 @@ RESTORE DATABASE успешно обработал 530 страниц за 0.010
 Обработано 2 страниц для базы данных "DiffBackupTestDB", файл "TestDB_log" для файла 23. [SQLSTATE 01000]
 RESTORE DATABASE успешно обработал 58 страниц за 0.006 секунд (74.869 MБ/сек). [SQLSTATE 01000]
 ```
+
+Работа с Maintance Plan
+
+Задание 1
+
+Шаг 1
+![Task1](https://github.com/user-attachments/assets/6b8369bc-6ede-4e21-ab19-f98110146db2)
+
+Шаг 2
+![image](https://github.com/user-attachments/assets/68579adf-8425-4ff3-ad86-f2b2015cf6d6)
+
+![image](https://github.com/user-attachments/assets/9be8c0c1-32d4-477a-ba60-fc6ab532753a)
+
+Задание 2
+
+Шаг 1
+![Task2](https://github.com/user-attachments/assets/cc09b4f3-d4ba-4ff6-b479-f5d2394c399e)
+
+Шаг 2
+![image](https://github.com/user-attachments/assets/68579adf-8425-4ff3-ad86-f2b2015cf6d6)
+
+Шаг 3
+![image](https://github.com/user-attachments/assets/4de7a6fd-2976-46ef-88e2-a6dcc54b1dd2)
+
+![image](https://github.com/user-attachments/assets/7647601f-a706-4eff-afaa-cedcf0e20525)
+
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab9
 <h3 align="center">
