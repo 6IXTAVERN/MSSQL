@@ -1649,6 +1649,183 @@ SELECT [DateOfBirth] FROM Persons
 | 1978-04-05 |
 | 1992-08-12 |
 
+# <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab8
+<h3 align="center">
+  <a href="#client"></a>
+  Работа с бэкапами. *Все скрипты, сгенерированные MSSQL можно найти в репозиторий/Lab8
+</h3>
+
+Задание 1.
+
+Шаг 1. T-SQL
+```tsql
+BACKUP DATABASE [TestDB]
+TO DISK = 'C:\Backup(Task1)\SourceBak\TestDB.bak'
+WITH NOINIT;
+```
+
+Шаг 2. cmd
+```cmd
+powershell.exe -ExecutionPolicy Bypass -File "C:\Backup(Task1)\CopyBackup.ps1"
+```
+
+Содержимое CopyBackup.ps1
+```ps1
+$source = "C:\Backup(Task1)\SourceBak\TestDB.bak"
+$destination = "C:\Backup(Task1)\TargetBak\"
+$logFile = "C:\Backup(Task1)\SourceBak\log.txt"
+
+try {
+    Copy-Item -Path $source -Destination $destination -ErrorAction Stop
+    $logMessage = "Задание ""DB_Backup(task1)"": шаг 2, ""Копирование .bak"" '$source' в '$destination' завершено успешно."
+} catch {
+    $logMessage = "Задание ""DB_Backup(task1)"": шаг 2, ""Копирование .bak"" '$source' не удалось. $_"
+}
+
+Add-Content -Path $logFile -Value $logMessage
+```
+
+Настройки расписания:
+![image](https://github.com/user-attachments/assets/cf8a6085-a2d1-47c4-acc2-d4c6efe8355c)
+
+Файлы логов за несколько запусков:
+```txt
+Задание "DB_Backup(task1)": шаг 1, "DB Backup": началось выполнение 2024-12-15 00:29:42
+Обработано 528 страниц для базы данных "TestDB", файл "TestDB" для файла 31. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "TestDB", файл "TestDB_log" для файла 31. [SQLSTATE 01000]
+BACKUP DATABASE успешно обработал 530 страниц за 0.021 секунд (196.986 MБ/сек). [SQLSTATE 01000]
+Задание "DB_Backup(task1)": шаг 2, "Копирование .bak" 'C:\Backup(Task1)\SourceBak\TestDB.bak' в 'C:\Backup(Task1)\TargetBak\' завершено успешно.
+
+Задание "DB_Backup(task1)": шаг 1, "DB Backup": началось выполнение 2024-12-15 00:29:53
+Обработано 528 страниц для базы данных "TestDB", файл "TestDB" для файла 32. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "TestDB", файл "TestDB_log" для файла 32. [SQLSTATE 01000]
+BACKUP DATABASE успешно обработал 530 страниц за 0.023 секунд (179.857 MБ/сек). [SQLSTATE 01000]
+Задание "DB_Backup(task1)": шаг 2, "Копирование .bak" 'C:\Backup(Task1)\SourceBak\TestDB.bak' в 'C:\Backup(Task1)\TargetBak\' завершено успешно.
+
+Задание "DB_Backup(task1)": шаг 1, "DB Backup": началось выполнение 2024-12-15 00:31:21
+Обработано 528 страниц для базы данных "TestDB", файл "TestDB" для файла 33. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "TestDB", файл "TestDB_log" для файла 33. [SQLSTATE 01000]
+BACKUP DATABASE успешно обработал 530 страниц за 0.023 секунд (179.857 MБ/сек). [SQLSTATE 01000]
+Задание "DB_Backup(task1)": шаг 2, "Копирование .bak" 'C:\Backup(Task1)\SourceBak\TestDB.bak' в 'C:\Backup(Task1)\TargetBak\' завершено успешно.
+```
+
+Задание 2.
+
+Шаг1. T-SQL
+```tsql
+BACKUP DATABASE [TestDB] 
+TO DISK = 'C:\Backup(Task2)\SourceBak\TestDBdiff.bak' 
+WITH DIFFERENTIAL;
+```
+
+Шаг2. cmd
+```cmd
+powershell.exe -ExecutionPolicy Bypass -File "C:\Backup(Task2)\CopyBackup.ps1"
+```
+
+Содержимое CopyBackup.ps1
+```ps1
+$source = "C:\Backup(Task2)\SourceBak\TestDBdiff.bak"
+$destination = "C:\Backup(Task2)\TargetBak\"
+$logFile = "C:\Backup(Task2)\SourceBak\log.txt"
+
+try {
+    Copy-Item -Path $source -Destination $destination -ErrorAction Stop
+    $logMessage = "Задание ""DB_Diff_Backup(task2)"": шаг 2, ""Копирование .bak"" '$source' в '$destination' завершено успешно."
+} catch {
+    $logMessage = "Задание ""DB_Diff_Backup(task2)"": шаг 2, ""Копирование .bak"" '$source' не удалось. $_"
+}
+
+Add-Content -Path $logFile -Value $logMessage
+
+```
+
+Шаг3. T-SQL
+```tsql
+------------------ Part1: Восстановить последний полный бэкап
+IF DB_ID(N'DiffBackupTestDB') IS NOT NULL
+BEGIN
+    ALTER DATABASE [DiffBackupTestDB]
+    SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [DiffBackupTestDB]
+END;
+GO
+
+DECLARE @lastPosition INT
+SELECT TOP 1 @lastPosition = [position]
+FROM [msdb].[dbo].[backupset]
+WHERE [database_name] = N'TestDB' AND [type] = 'D'
+ORDER BY [backup_finish_date] DESC;
+
+-- Восстанавливаем базу данных из актуального полного бэкапа
+RESTORE DATABASE [DiffBackupTestDB]
+FROM DISK = 'C:\Backup(Task1)\TargetBak\TestDB.bak'
+WITH FILE = @lastPosition,
+MOVE 'TestDB' TO 'C:\MS SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\DiffBackupTestDB.mdf',
+MOVE 'TestDB_log' TO 'C:\MS SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\DiffBackupTestDB_log.ldf',
+NORECOVERY
+GO
+
+------------------ Part2: Восстановить последний дифференциальный бэкап
+DECLARE @lastPosition INT
+SELECT TOP 1 @lastPosition = [position]
+FROM [msdb].[dbo].[backupset]
+WHERE [database_name] = N'TestDB' AND [type] = 'I'
+ORDER BY [backup_finish_date] DESC;
+
+RESTORE DATABASE [DiffBackupTestDB]
+FROM DISK = 'C:\Backup(Task2)\TargetBak\TestDBdiff.bak'
+WITH FILE = @lastPosition,
+MOVE 'TestDB' TO 'C:\MS SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\DiffBackupTestDB.mdf',
+MOVE 'TestDB_log' TO 'C:\MS SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\DiffBackupTestDB_log.ldf',
+RECOVERY
+GO
+```
+
+Настройки расписания:
+![image](https://github.com/user-attachments/assets/4777166c-247d-4c4c-9998-89134591e5a4)
+
+Файлы логов за несколько запусков:
+```txt
+Задание "DB_Diff_Backup(task2)": шаг 1, "Создание дифф. копии": началось выполнение 2024-12-15 00:33:15
+Обработано 56 страниц для базы данных "TestDB", файл "TestDB" для файла 21. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "TestDB", файл "TestDB_log" для файла 21. [SQLSTATE 01000]
+BACKUP DATABASE WITH DIFFERENTIAL успешно обработал 58 страниц за 0.015 секунд (29.947 MБ/сек). [SQLSTATE 01000]
+Задание "DB_Diff_Backup(task2)": шаг 2, "Копирование .bak" 'C:\Backup(Task2)\SourceBak\TestDBdiff.bak' в 'C:\Backup(Task2)\TargetBak\' завершено успешно.
+Задание "DB_Diff_Backup(task2)": шаг 3, "Восстановление новой БД": началось выполнение 2024-12-15 00:33:16
+Обработано 528 страниц для базы данных "DiffBackupTestDB", файл "TestDB" для файла 33. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "DiffBackupTestDB", файл "TestDB_log" для файла 33. [SQLSTATE 01000]
+RESTORE DATABASE успешно обработал 530 страниц за 0.012 секунд (344.726 MБ/сек). [SQLSTATE 01000]
+Обработано 56 страниц для базы данных "DiffBackupTestDB", файл "TestDB" для файла 21. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "DiffBackupTestDB", файл "TestDB_log" для файла 21. [SQLSTATE 01000]
+RESTORE DATABASE успешно обработал 58 страниц за 0.007 секунд (64.174 MБ/сек). [SQLSTATE 01000]
+
+Задание "DB_Diff_Backup(task2)": шаг 1, "Создание дифф. копии": началось выполнение 2024-12-15 00:33:23
+Обработано 56 страниц для базы данных "TestDB", файл "TestDB" для файла 22. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "TestDB", файл "TestDB_log" для файла 22. [SQLSTATE 01000]
+BACKUP DATABASE WITH DIFFERENTIAL успешно обработал 58 страниц за 0.018 секунд (24.956 MБ/сек). [SQLSTATE 01000]
+Задание "DB_Diff_Backup(task2)": шаг 2, "Копирование .bak" 'C:\Backup(Task2)\SourceBak\TestDBdiff.bak' в 'C:\Backup(Task2)\TargetBak\' завершено успешно.
+Задание "DB_Diff_Backup(task2)": шаг 3, "Восстановление новой БД": началось выполнение 2024-12-15 00:33:24
+Обработано 528 страниц для базы данных "DiffBackupTestDB", файл "TestDB" для файла 33. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "DiffBackupTestDB", файл "TestDB_log" для файла 33. [SQLSTATE 01000]
+RESTORE DATABASE успешно обработал 530 страниц за 0.012 секунд (344.726 MБ/сек). [SQLSTATE 01000]
+Обработано 56 страниц для базы данных "DiffBackupTestDB", файл "TestDB" для файла 22. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "DiffBackupTestDB", файл "TestDB_log" для файла 22. [SQLSTATE 01000]
+RESTORE DATABASE успешно обработал 58 страниц за 0.007 секунд (64.174 MБ/сек). [SQLSTATE 01000]
+
+Задание "DB_Diff_Backup(task2)": шаг 1, "Создание дифф. копии": началось выполнение 2024-12-15 00:33:32
+Обработано 56 страниц для базы данных "TestDB", файл "TestDB" для файла 23. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "TestDB", файл "TestDB_log" для файла 23. [SQLSTATE 01000]
+BACKUP DATABASE WITH DIFFERENTIAL успешно обработал 58 страниц за 0.016 секунд (28.076 MБ/сек). [SQLSTATE 01000]
+Задание "DB_Diff_Backup(task2)": шаг 2, "Копирование .bak" 'C:\Backup(Task2)\SourceBak\TestDBdiff.bak' в 'C:\Backup(Task2)\TargetBak\' завершено успешно.
+Задание "DB_Diff_Backup(task2)": шаг 3, "Восстановление новой БД": началось выполнение 2024-12-15 00:33:32
+Обработано 528 страниц для базы данных "DiffBackupTestDB", файл "TestDB" для файла 33. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "DiffBackupTestDB", файл "TestDB_log" для файла 33. [SQLSTATE 01000]
+RESTORE DATABASE успешно обработал 530 страниц за 0.010 секунд (413.671 MБ/сек). [SQLSTATE 01000]
+Обработано 56 страниц для базы данных "DiffBackupTestDB", файл "TestDB" для файла 23. [SQLSTATE 01000]
+Обработано 2 страниц для базы данных "DiffBackupTestDB", файл "TestDB_log" для файла 23. [SQLSTATE 01000]
+RESTORE DATABASE успешно обработал 58 страниц за 0.006 секунд (74.869 MБ/сек). [SQLSTATE 01000]
+```
 
 # <img src="https://github.com/user-attachments/assets/e080adec-6af7-4bd2-b232-d43cb37024ac" width="20" height="20"/> Lab9
 <h3 align="center">
