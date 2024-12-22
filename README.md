@@ -1295,13 +1295,13 @@ public class Main
         {
             sql_connect.Open();
             var trigger = new SqlCommand(
-                $"CREATE OR ALTER TRIGGER TriggerFor{tableName} " +
-                $"ON {tableName} " +
+                $"CREATE OR ALTER TRIGGER TriggerFor{table_name} " +
+                $"ON {table_name} " +
                 $"AFTER INSERT " +
                 $"AS " +
                 $"BEGIN " +
-                $"PRINT 'Trigger executed by table: {tableName}'; " +
-                $"END;", sqlCnn
+                $"PRINT 'Trigger executed by table: {table_name}'; " +
+                $"END;", sql_connect
             );
             trigger.ExecuteNonQuery();
         }
